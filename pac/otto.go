@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/url"
 	"sync"
+	"os/exec"
+	"strings"
 
 	"github.com/robertkrimen/otto"
 	"github.com/williambailey/pacproxy/pacfunc"
@@ -229,6 +231,21 @@ func (o *OttoEngine) Start() error {
 		}
 		return
 	})
+	
+	vm.Set("isVpnActive", func(call otto.FunctionCall) (value otto.Value) {
+		value = otto.FalseValue()
+		var (
+			iface string
+			err  error
+		)
+		if iface, err = call.Argument(0).ToString(); err != nil {
+			return
+		}
+		if v, err := vm.ToValue(doesInterfaceExist(iface)); err == nil {
+			value = v
+		}
+		return
+	})
 
 	// DNSDomainLevels(host string) int
 	vm.Set("dnsDomainLevels", func(call otto.FunctionCall) (value otto.Value) {
@@ -369,4 +386,14 @@ func (o *OttoEngine) FindProxyForURL(in *url.URL) (Proxies, error) {
 	}
 
 	return ParseFindProxyString(findProxyString)
+}
+func doesInterfaceExist(iface string) (bool) {
+	cmd := exec.Command("ip", "link", "show", iface)
+	output, err := cmd.CombinedOutput()
+	log.Printf("output: %q", output)
+	if err != nil {
+		return false
+	}
+	log.Printf("output: %q", strings.Contains(string(output), "state UP"))
+	return strings.Contains(string(output), "state UP")
 }
